@@ -97,8 +97,6 @@ def main():
 
     publication_to_schools = {}
 
-    print("\nScanning publications for IPG co-authorship...\n")
-
     for school in schools:
 
         dataframe = all_publications[school]
