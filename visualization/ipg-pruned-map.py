@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 
 
-adjacency_path = "data/national/pruned/threshold/threshold_p0.1_f10.csv"
+adjacency_path = "data/national/pruned/mutual/mutual_p0.2.csv"
 coord_csv = "data/national/school_coordinates.csv"
 
 
@@ -77,7 +77,7 @@ def create_component_map(G, coords, save_path, title):
     )
 
     fig.write_html(save_path)
-    fig.show()
+    # fig.show()
 
 
 def main():

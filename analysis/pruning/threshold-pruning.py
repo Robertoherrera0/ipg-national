@@ -8,10 +8,8 @@ relative_matrix_csv = "data/national/national_ipg_matrix_relative.csv"
 output_dir = "data/national/pruned/threshold"
 os.makedirs(output_dir, exist_ok=True)
 
-# Smaller, realistic grids
-thresholds = [0.03, 0.05, 0.07, 0.10, 0.12]
-floors = [10, 20, 30, 40, 50]
-
+thresholds = [0.03, 0.05, 0.07, 0.10, 0.15, 0.20, 0.25]
+floors = [20, 30, 40, 50, 60]
 
 def prune_graph(rel_adj, raw_adj, percent_threshold, floor):
     G = nx.Graph()
@@ -44,13 +42,25 @@ def main():
     for p in thresholds:
         for f in floors:
             G = prune_graph(rel_adj, raw_adj, p, f)
+
             pruned_adj = graph_to_adj_df(G, raw_adj.index)
 
             filename = f"threshold_p{p}_f{f}.csv"
             output_path = os.path.join(output_dir, filename)
             pruned_adj.to_csv(output_path)
 
-            print(f"Saved: {filename} | Edges: {G.number_of_edges()}")
+            edges = G.number_of_edges()
+            nodes = G.number_of_nodes()
+            components = nx.number_connected_components(G)
+            largest_component = max(len(c) for c in nx.connected_components(G)) if edges > 0 else 0
+
+            print(
+                f"{filename} | "
+                f"edges={edges} | "
+                f"nodes={nodes} | "
+                f"components={components} | "
+                f"largest_component={largest_component}"
+            )
 
 
 if __name__ == "__main__":
