@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 
 
-adjacency_path = "data/national/pruned/mutual/mutual_p0.2.csv"
+adjacency_path = "data/national/pruned/mutual/mutual_p0.35.csv"
 coord_csv = "data/national/school_coordinates.csv"
 
 
