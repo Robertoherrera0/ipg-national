@@ -18,7 +18,6 @@ def load_coordinates(path):
 
 
 def create_component_map(G, coords, save_path, title):
-
     fig = go.Figure()
 
     components = list(nx.connected_components(G))
