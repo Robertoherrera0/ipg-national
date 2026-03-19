@@ -1,65 +1,33 @@
 import pandas as pd
-import statsmodels.api as sm
-from sklearn.preprocessing import StandardScaler
-from statsmodels.stats.outliers_influence import variance_inflation_factor
+import seaborn as sns
+import matplotlib.pyplot as plt
 
-# ---------------------------------------------------------
-# Load data
-# ---------------------------------------------------------
+corr = pd.read_csv("pagerank_correlations.csv", index_col=0)
 
-df = pd.read_csv("data/ipg_combined_metrics.csv")
+values = corr.iloc[:, 0]
+corr_matrix = pd.DataFrame(values)
+corr_matrix.columns = ["PageRank"]
 
-predictors = [
-    "EdgesPerNode",
-    "assortativity_unweighted",
-    "global_efficiency",
-    "local_efficiency",
-    "avg_path_over_diameter",
-    "clique_integration",
-    "sigma_small_world_index",
-    "omega_small_world_index"
-]
+fig, ax = plt.subplots(figsize=(6,8))
 
-y = df["pagerank"]
-X = df[predictors]
+sns.heatmap(
+    corr_matrix,
+    annot=True,
+    cmap="coolwarm",
+    vmin=0,
+    vmax=1,
+    cbar=True,
+    linewidths=0.5,
+    linecolor="white",
+    annot_kws={"size":11},
+    ax=ax
+)
 
-# ---------------------------------------------------------
-# OLS regression
-# ---------------------------------------------------------
+ax.set_title("Spearman Correlation with PageRank", fontsize=14, pad=12)
 
-X_const = sm.add_constant(X)
+ax.set_xticklabels(ax.get_xticklabels(), fontsize=11)
+ax.set_yticklabels(ax.get_yticklabels(), fontsize=11, rotation=0)
 
-model = sm.OLS(y, X_const).fit()
-
-print("\nOLS REGRESSION: PageRank ~ Internal Metrics\n")
-print(model.summary())
-
-# ---------------------------------------------------------
-# Standardized coefficients
-# ---------------------------------------------------------
-
-scaler = StandardScaler()
-
-X_scaled = scaler.fit_transform(X)
-y_scaled = (y - y.mean()) / y.std()
-
-model_std = sm.OLS(y_scaled, sm.add_constant(X_scaled)).fit()
-
-std_coefs = pd.Series(model_std.params[1:], index=predictors)
-
-print("\nSTANDARDIZED COEFFICIENTS\n")
-print(std_coefs.sort_values(key=abs, ascending=False))
-
-# ---------------------------------------------------------
-# Variance Inflation Factor (multicollinearity)
-# ---------------------------------------------------------
-
-vif_df = pd.DataFrame()
-vif_df["variable"] = predictors
-vif_df["VIF"] = [
-    variance_inflation_factor(X.values, i)
-    for i in range(X.shape[1])
-]
-
-print("\nVARIANCE INFLATION FACTOR\n")
-print(vif_df.sort_values("VIF", ascending=False))
+plt.tight_layout()
+plt.savefig("pagerank_correlation_matrix.png", dpi=300, bbox_inches="tight")
+plt.show()

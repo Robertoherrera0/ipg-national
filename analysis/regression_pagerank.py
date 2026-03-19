@@ -1,122 +1,181 @@
-import os
 import pandas as pd
 import statsmodels.api as sm
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LassoCV
-from statsmodels.stats.outliers_influence import variance_inflation_factor
 import matplotlib.pyplot as plt
-import seaborn as sns
 
-DATA="data/ipg_metrics_with_pagerank.csv"
-OUT="analysis_outputs"
-os.makedirs(OUT,exist_ok=True)
+df = pd.read_csv("data/ipg_metrics_with_pagerank.csv")
 
-predictors=[
-"EdgesPerNode",
-"assortativity_unweighted",
-"global_efficiency",
-"local_efficiency",
-"avg_path_over_diameter",
-"clique_integration",
-"sigma_small_world_index",
-"omega_small_world_index"
+y = df["pagerank"]
+labels = df["school"]
+
+predictors = [
+    "EdgesPerNode",
+    "clique_integration",
+    "global_efficiency",
+    "local_efficiency"
 ]
 
-df=pd.read_csv(DATA)
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+axes = axes.flatten()
 
-X=df[predictors]
-y=df["pagerank"]
+for i, var in enumerate(predictors):
+    ax = axes[i]
+    x = df[var]
 
-pearson=df[predictors+["pagerank"]].corr(method="pearson")
-spearman=df[predictors+["pagerank"]].corr(method="spearman")
+    X = sm.add_constant(x)
+    model = sm.OLS(y, X).fit()
+    y_pred = model.predict(X)
 
-Xc=sm.add_constant(X)
-ols=sm.OLS(y,Xc).fit()
-robust=ols.get_robustcov_results(cov_type="HC3")
+    ax.scatter(x, y)
 
-scaler=StandardScaler()
-Xs=pd.DataFrame(scaler.fit_transform(X),columns=predictors)
-ys=(y-y.mean())/y.std()
-std_model=sm.OLS(ys,sm.add_constant(Xs)).fit()
-std_coefs=std_model.params[1:]
+    idx = x.argsort()
+    ax.plot(x.iloc[idx], y_pred.iloc[idx], color="red")
 
-lasso=LassoCV(cv=5,max_iter=10000).fit(Xs,ys)
-lasso_coefs=pd.Series(lasso.coef_,index=predictors)
+    for j, txt in enumerate(labels):
+        ax.annotate(txt, (x.iloc[j], y.iloc[j]), fontsize=6)
 
-vif=pd.DataFrame()
-vif["variable"]=predictors
-vif["VIF"]=[variance_inflation_factor(X.values,i) for i in range(len(predictors))]
+    ax.text(
+        0.05, 0.95,
+        f"β={model.params[1]:.3f}\np={model.pvalues[1]:.3f}\nR²={model.rsquared:.3f}",
+        transform=ax.transAxes,
+        verticalalignment='top',
+        bbox=dict(facecolor='white', alpha=0.7)
+    )
 
-ranking=df.sort_values("pagerank",ascending=False)
+    ax.set_title(f"{var} vs PageRank")
 
-coef_table=pd.DataFrame({
-"coef":ols.params,
-"p_value":ols.pvalues
-})
-
-coef_robust=pd.DataFrame({
-"coef":robust.params,
-"p_value_HC3":robust.pvalues
-})
-
-std_table=pd.DataFrame({
-"standardized_beta":std_coefs
-})
-
-lasso_table=pd.DataFrame({
-"lasso_coef":lasso_coefs
-})
-
-excel=f"{OUT}/pagerank_analysis.xlsx"
-
-with pd.ExcelWriter(excel) as w:
-    coef_table.to_excel(w,"OLS")
-    coef_robust.to_excel(w,"Robust_HC3")
-    std_table.to_excel(w,"Standardized_Betas")
-    lasso_table.to_excel(w,"LASSO")
-    vif.to_excel(w,"VIF")
-    pearson.to_excel(w,"Pearson_Corr")
-    spearman.to_excel(w,"Spearman_Corr")
-    ranking.to_excel(w,"PageRank_Ranking")
-
-plt.figure(figsize=(12,10))
-sns.heatmap(pearson,annot=True,cmap="coolwarm",vmin=-1,vmax=1,square=True)
 plt.tight_layout()
-plt.savefig(f"{OUT}/correlation_heatmap.png",dpi=600)
-plt.close()
+plt.show()
 
-for v in predictors:
-    plt.figure(figsize=(8,6))
-    sns.regplot(data=df,x=v,y="pagerank",scatter_kws={"s":80},line_kws={"color":"red"})
-    plt.tight_layout()
-    plt.savefig(f"{OUT}/regression_{v}.png",dpi=600)
-    plt.close()
 
-plt.figure(figsize=(10,12))
-sns.barplot(data=ranking,y="school",x="pagerank",color="steelblue")
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+axes = axes.flatten()
+
+for i, var in enumerate(predictors):
+    ax = axes[i]
+    x = df[var]
+
+    X = sm.add_constant(x)
+    model = sm.OLS(y, X).fit()
+    residuals = model.resid
+
+    ax.scatter(x, residuals)
+
+    for j, txt in enumerate(labels):
+        ax.annotate(txt, (x.iloc[j], residuals.iloc[j]), fontsize=6)
+
+    ax.axhline(0, linestyle="--")
+
+    ax.text(
+        0.05, 0.95,
+        f"R²={model.rsquared:.3f}",
+        transform=ax.transAxes,
+        verticalalignment='top',
+        bbox=dict(facecolor='white', alpha=0.7)
+    )
+
+    ax.set_title(f"Residuals vs {var}")
+
 plt.tight_layout()
-plt.savefig(f"{OUT}/pagerank_ranking.png",dpi=600)
-plt.close()
+plt.show()
 
-plt.figure(figsize=(8,6))
-sns.histplot(df["pagerank"],kde=True)
+
+X_full = sm.add_constant(df[predictors])
+model_full = sm.OLS(y, X_full).fit()
+yhat_full = model_full.fittedvalues
+resid_full = model_full.resid
+
+predictors_wo = [v for v in predictors if v != "EdgesPerNode"]
+X_wo = sm.add_constant(df[predictors_wo])
+model_wo = sm.OLS(y, X_wo).fit()
+yhat_wo = model_wo.fittedvalues
+resid_wo = model_wo.resid
+
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+idx = y.argsort()
+
+axes[0].scatter(y, yhat_full)
+axes[0].plot(y.iloc[idx], y.iloc[idx], color="red")
+
+for j, txt in enumerate(labels):
+    axes[0].annotate(txt, (y.iloc[j], yhat_full.iloc[j]), fontsize=6)
+
+axes[0].text(
+    0.05, 0.95,
+    f"R²={model_full.rsquared:.3f}",
+    transform=axes[0].transAxes,
+    verticalalignment='top',
+    bbox=dict(facecolor='white', alpha=0.7)
+)
+
+axes[0].set_title("Full Model")
+axes[0].set_xlabel("Actual PageRank")
+axes[0].set_ylabel("Predicted PageRank")
+
+
+axes[1].scatter(y, yhat_wo)
+axes[1].plot(y.iloc[idx], y.iloc[idx], color="red")
+
+for j, txt in enumerate(labels):
+    axes[1].annotate(txt, (y.iloc[j], yhat_wo.iloc[j]), fontsize=6)
+
+axes[1].text(
+    0.05, 0.95,
+    f"R²={model_wo.rsquared:.3f}",
+    transform=axes[1].transAxes,
+    verticalalignment='top',
+    bbox=dict(facecolor='white', alpha=0.7)
+)
+
+axes[1].set_title("Without EdgesPerNode")
+axes[1].set_xlabel("Actual PageRank")
+axes[1].set_ylabel("Predicted PageRank")
+
 plt.tight_layout()
-plt.savefig(f"{OUT}/pagerank_distribution.png",dpi=600)
-plt.close()
+plt.show()
 
-print("\nOLS\n")
-print(ols.summary())
 
-print("\nROBUST HC3\n")
-print(robust.summary())
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 
-print("\nSTANDARDIZED COEFFICIENTS\n")
-print(std_coefs.sort_values(key=abs,ascending=False))
+axes[0].scatter(yhat_full, resid_full)
 
-print("\nLASSO COEFFICIENTS\n")
-print(lasso_coefs.sort_values(key=abs,ascending=False))
+for j, txt in enumerate(labels):
+    axes[0].annotate(txt, (yhat_full.iloc[j], resid_full.iloc[j]), fontsize=6)
 
-print("\nVIF\n")
-print(vif.sort_values("VIF",ascending=False))
+axes[0].axhline(0, linestyle="--")
 
-print("\nOutput saved to:",OUT)
+axes[0].text(
+    0.05, 0.95,
+    f"R²={model_full.rsquared:.3f}",
+    transform=axes[0].transAxes,
+    verticalalignment='top',
+    bbox=dict(facecolor='white', alpha=0.7)
+)
+
+axes[0].set_title("Full Model Residuals")
+axes[0].set_xlabel("Predicted PageRank")
+axes[0].set_ylabel("Residuals")
+
+
+axes[1].scatter(yhat_wo, resid_wo)
+
+for j, txt in enumerate(labels):
+    axes[1].annotate(txt, (yhat_wo.iloc[j], resid_wo.iloc[j]), fontsize=6)
+
+axes[1].axhline(0, linestyle="--")
+
+axes[1].text(
+    0.05, 0.95,
+    f"R²={model_wo.rsquared:.3f}",
+    transform=axes[1].transAxes,
+    verticalalignment='top',
+    bbox=dict(facecolor='white', alpha=0.7)
+)
+
+axes[1].set_title("Without EdgesPerNode Residuals")
+axes[1].set_xlabel("Predicted PageRank")
+axes[1].set_ylabel("Residuals")
+
+plt.tight_layout()
+plt.show()
