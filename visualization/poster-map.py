@@ -21,6 +21,65 @@ METRICS   = "data/ipg_combined_metrics_v2.csv"
 OUT       = "visualization/pruned/mutual"
 os.makedirs(OUT, exist_ok=True)
 
+
+SCHOOL_NAMES = {
+    "Alaska":          "U. of Alaska",
+    "Arizona":         "U. of Arizona",
+    "Auburn":          "Auburn U.",
+    "Clemson":         "Clemson U.",
+    "ColoradoState":   "Colorado State U.",
+    "Connecticut":     "U. of Connecticut",
+    "Cornell":         "Cornell U.",
+    "Delaware":        "U. of Delaware",
+    "Florida":         "U. of Florida",
+    "Georgia":         "U. of Georgia",
+    "Hawaii":          "U. of Hawaii",
+    "Idaho":           "U. of Idaho",
+    "Illinois":        "U. of Illinois",
+    "Iowa":            "U. of Iowa",
+    "IowaState":       "Iowa State U.",
+    "Kentucky":        "U. of Kentucky",
+    "KState":          "Kansas State U.",
+    "LouisianaState":  "Louisiana State U.",
+    "Maine":           "U. of Maine",
+    "Maryland":        "U. of Maryland",
+    "Massachusetts":   "UMass Amherst",
+    "Michigan":        "U. of Michigan",
+    "Minnesota":       "U. of Minnesota",
+    "Mississippi":     "Mississippi State U.",
+    "MontanaState":    "Montana State U.",
+    "MU":              "U. of Missouri",
+    "Nebraska":        "U. of Nebraska",
+    "Nevada":          "U. of Nevada",
+    "NewHampshire":    "U. of New Hampshire",
+    "NewMexico":       "New Mexico State U.",
+    "NorthCarolina":   "NC State U.",
+    "NorthDakota":     "North Dakota State U.",
+    "OhioState":       "Ohio State U.",
+    "OKState":         "Oklahoma State U.",
+    "Oregon":          "Oregon State U.",
+    "PennState":       "Penn State U.",
+    "Purdue":          "Purdue U.",
+    "RhodeIsland":     "U. of Rhode Island",
+    "Rutgers":         "Rutgers U.",
+    "SouthDakota":     "South Dakota State U.",
+    "TexasA&M":        "Texas A&M U.",
+    "UArk":            "U. of Arkansas",
+    "UCDavis":         "UC Davis",
+    "UCRiver":         "UC Riverside",
+    "UtahState":       "Utah State U.",
+    "UTenn":           "U. of Tennessee",
+    "Vermont":         "U. of Vermont",
+    "VirginiaTech":    "Virginia Tech",
+    "WashState":       "Washington State U.",
+    "WestVirginia":    "West Virginia U.",
+    "Wisconsin":       "U. of Wisconsin",
+    "Wyoming":         "U. of Wyoming",
+}
+# ── D
+def display_name(school):
+    return SCHOOL_NAMES.get(school, school)
+
 # ── LOAD ──────────────────────────────────────────────────────────
 adj     = pd.read_csv(ADJACENCY, index_col=0)
 adj.index   = adj.index.str.strip()
@@ -31,7 +90,6 @@ coords.index = coords.index.str.strip()
 
 coords.loc["Hawaii", "latitude"]  = 26.0
 coords.loc["Hawaii", "longitude"] = -106.0
-
 
 metrics = pd.read_csv(METRICS).dropna(subset=["pagerank", "EdgesPerNode"])
 metrics["school"] = metrics["school"].str.strip()
@@ -77,7 +135,6 @@ for school in list(schools_with_coords):
     if pd.isna(lat) or pd.isna(lon):
         print(f"  WARNING: dropping {school} — missing coords")
         schools_with_coords.discard(school)
-    # Continental US + Hawaii + Alaska sanity check
     elif not (-180 <= lon <= -60 and 15 <= lat <= 72):
         print(f"  WARNING: dropping {school} — coords out of range ({lat}, {lon})")
         schools_with_coords.discard(school)
@@ -92,13 +149,9 @@ edge_weights = [G[u][v].get("weight", 1)
 w_min = min(edge_weights) if edge_weights else 1
 w_max = max(edge_weights) if edge_weights else 1
 
-log_min = np.log1p(w_min)
-log_max = np.log1p(w_max)
-
 WIDTH_MIN, WIDTH_MAX = 0.5, 6.0
 
 print(f"  Weight range: {w_min} – {w_max}")
-print(f"  Log range:    {log_min:.2f} – {log_max:.2f}")
 
 for u, v in G.edges():
     if u not in schools_with_coords or v not in schools_with_coords:
@@ -109,33 +162,21 @@ for u, v in G.edges():
     lat2 = float(coords.loc[v, "latitude"])
     lon2 = float(coords.loc[v, "longitude"])
 
-    w     = G[u][v].get("weight", 1)
-    log_w = np.log1p(w)
-
-    if w_max > w_min:
-        frac = (w - w_min) / (w_max - w_min)
-    else:
-        frac = 0.5
-
-
-    frac = frac ** 2
-
-    width = WIDTH_MIN + frac * (WIDTH_MAX - WIDTH_MIN)
-    opacity = 0.45 + 0.55 * frac   # floor at 0.45, max 1.0
+    w    = G[u][v].get("weight", 1)
+    frac = ((w - w_min) / (w_max - w_min)) ** 2 if w_max > w_min else 0.5
+    width   = WIDTH_MIN + frac * (WIDTH_MAX - WIDTH_MIN)
+    opacity = 0.45 + 0.55 * frac
 
     fig.add_trace(go.Scattergeo(
         lon=[lon1, lon2],
         lat=[lat1, lat2],
         mode="lines",
-        line=dict(
-            width=width,
-            color=f"rgba(30,50,110,{opacity:.2f})",
-        ),
+        line=dict(width=width, color=f"rgba(30,50,110,{opacity:.2f})"),
         hoverinfo="skip",
         showlegend=False,
     ))
 
-# ── NODESa
+# ── NODES ─────────────────────────────────────────────────────────
 for group, color, name in [
     ("Upper mode", "#1A3A5C", "High PageRank"),
     ("Lower mode", "#7FAFD4", "Low PageRank"),
@@ -149,9 +190,9 @@ for group, color, name in [
         lats.append(float(coords.loc[school, "latitude"]))
         lons.append(float(coords.loc[school, "longitude"]))
         sizes.append(scale_size(pr_val))
-        texts.append(school)
+        texts.append(display_name(school))          # ← mapped name
         hovers.append(
-            f"<b>{school}</b><br>"
+            f"<b>{display_name(school)}</b><br>"
             f"PageRank: {pr_val:.5f}<br>"
             f"EdgesPerNode: {epn:.3f}"
         )
@@ -169,15 +210,15 @@ for group, color, name in [
         showlegend=True,
     ))
 
-# ── DISCONNECTED
+# ── DISCONNECTED ──────────────────────────────────────────────────
 disc_lats, disc_lons, disc_texts, disc_hovers = [], [], [], []
 for school in disconnected:
     if school not in schools_with_coords:
         continue
     disc_lats.append(float(coords.loc[school, "latitude"]))
     disc_lons.append(float(coords.loc[school, "longitude"]))
-    disc_texts.append(school)
-    disc_hovers.append(f"<b>{school}</b><br>Not connected")
+    disc_texts.append(display_name(school))         # ← mapped name
+    disc_hovers.append(f"<b>{display_name(school)}</b><br>Not connected")
 
 if disc_lats:
     fig.add_trace(go.Scattergeo(
@@ -195,8 +236,8 @@ if disc_lats:
     ))
 
 fig.update_layout(
-    paper_bgcolor="rgba(0,0,0,0)",   # ← outer figure background
-    plot_bgcolor="rgba(0,0,0,0)",    # ← inner plot background
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
     geo=dict(
         scope="usa",
         projection_type="albers usa",
@@ -227,6 +268,7 @@ fig.update_layout(
 out_path = os.path.join(OUT, "network_pagerank_map.html")
 fig.write_html(out_path)
 print(f"\n  {out_path}")
-print("  Open in browser")
+
 out_path = os.path.join(OUT, "network_pagerank_map.svg")
 fig.write_image(out_path)
+print(f"  {out_path}")

@@ -26,26 +26,22 @@ def compute_top_partners(adj, percent):
 
 def prune_graph(adj, percent):
     top_partners = compute_top_partners(adj, percent)
-
     G = nx.Graph()
     G.add_nodes_from(adj.index)
-
     for i in adj.index:
         for j in top_partners[i]:
             if i in top_partners.get(j, set()):
-                G.add_edge(i, j)
-
+                G.add_edge(i, j, weight=adj.loc[i, j])  # ← keep original weight
     return G
-
 
 def graph_to_adj_df(G, nodes):
     df = pd.DataFrame(0, index=nodes, columns=nodes)
-    for u, v in G.edges():
-        df.loc[u, v] = 1
-        df.loc[v, u] = 1
+    for u, v, d in G.edges(data=True):
+        w = d.get("weight", 1)
+        df.loc[u, v] = w
+        df.loc[v, u] = w
     return df
-
-
+    
 def main():
     adj = pd.read_csv(raw_matrix_csv, index_col=0)
 
