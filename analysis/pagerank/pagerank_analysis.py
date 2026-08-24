@@ -1,11 +1,13 @@
+import os
 import pandas as pd
 import numpy as np
 import networkx as nx
 from scipy.stats import spearmanr
 
-national_file = "data/national/pruned/mutual/mutual_p0.35.csv"
+DATA_FILE = "data/national/pruned/mutual/mutual_p0.35.csv"
+OUTPUT_DIR = "results/tables"
 
-df = pd.read_csv(national_file, index_col=0)
+df = pd.read_csv(DATA_FILE, index_col=0)
 df = df.loc[df.index, df.index]
 
 G = nx.from_pandas_adjacency(df)
@@ -23,8 +25,13 @@ for a in alphas:
 scores_df = pd.DataFrame(pr_scores)
 ranks_df = pd.DataFrame(pr_ranks)
 
-scores_df.to_csv("pagerank_scores_by_alpha.csv")
-ranks_df.to_csv("pagerank_ranks_by_alpha.csv")
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+scores_df.to_csv(os.path.join(OUTPUT_DIR, "pagerank_scores_by_alpha.csv"))
+print(f"Saved: {OUTPUT_DIR}/pagerank_scores_by_alpha.csv")
+
+ranks_df.to_csv(os.path.join(OUTPUT_DIR, "pagerank_ranks_by_alpha.csv"))
+print(f"Saved: {OUTPUT_DIR}/pagerank_ranks_by_alpha.csv")
 
 national_df = pd.DataFrame(index=G.nodes())
 
@@ -50,7 +57,9 @@ for m in metrics:
     tmp = national_df[[m, "pagerank"]].dropna()
     corr[m] = spearmanr(tmp[m], tmp["pagerank"]).correlation
 
-pd.Series(corr).to_csv("pagerank_correlations.csv")
+corr_series = pd.Series(corr)
+corr_series.to_csv(os.path.join(OUTPUT_DIR, "pagerank_correlations.csv"))
+print(f"Saved: {OUTPUT_DIR}/pagerank_correlations.csv")
 
 stab = pd.DataFrame(index=alphas, columns=alphas)
 
@@ -64,4 +73,5 @@ for a in alphas:
     for b in alphas:
         stab.loc[a, b] = align_corr(pr_scores[a], pr_scores[b])
 
-stab.to_csv("pagerank_stability.csv")
+stab.to_csv(os.path.join(OUTPUT_DIR, "pagerank_stability.csv"))
+print(f"Saved: {OUTPUT_DIR}/pagerank_stability.csv")
