@@ -2,6 +2,9 @@
 *_Pubs.csv
 *_plus_USDA_Pubs.csv
 
+# old stuff
+
+.archive/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
